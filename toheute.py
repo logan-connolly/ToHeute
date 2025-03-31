@@ -146,13 +146,13 @@ def main():
         sys.exit(1)
     except KeyboardInterrupt:
         sys.exit(0)
-    else:
-        show_and_copy_files(
-            site=selected_site,
-            changed_files=changed_files,
-            repo_dir=repo.working_tree_dir,
-            console=console,
-        )
+
+    show_and_copy_files(
+        site=selected_site,
+        changed_files=changed_files,
+        repo_dir=repo.working_tree_dir,
+        console=console,
+    )
 
 
 if __name__ == "__main__":
