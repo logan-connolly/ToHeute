@@ -4,7 +4,7 @@
 
 ## setup
 
-The `toheute.py` is a self-contained python script that can be run by [uv](). Since it is an executable, you just need to make sure that the executable can be found on your path. For example:
+The `toheute.py` is a self-contained python script that can be run by [uv](https://github.com/astral-sh/uv). Since it is an executable, you just need to make sure that the executable can be found on your path. For example:
 
 ```console
 ln -sf $PWD/toheute.py $HOME/.local/bin/toheute.py
@@ -48,4 +48,4 @@ This is not an all inclusive tool for checkmk development, but instead a simple 
 
 ## acknowledgments
 
-The original script was created by @gavinmcguigan - all props should be directed his way.
+The original script was created by [@gavinmcguigan](https://github.com/gavinmcguigan) - all props should be directed his way.
