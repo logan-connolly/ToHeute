@@ -143,8 +143,9 @@ def main():
         changed_files = check_last_commit(repo, console)
     except (InvalidGitRepositoryError, ValueError):
         console.print("\nMake sure you are in a check_mk git repository.", style="red")
+        sys.exit(1)
     except KeyboardInterrupt:
-        pass
+        sys.exit(0)
     else:
         show_and_copy_files(
             site=selected_site,
