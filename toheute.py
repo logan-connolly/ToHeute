@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from git import GitConfigParser, InvalidGitRepositoryError, Repo, PathLike
+from git import GitConfigParser, InvalidGitRepositoryError, PathLike, Repo
 from rich.console import Console
 from rich.prompt import Prompt
 
