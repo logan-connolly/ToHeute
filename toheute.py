@@ -26,7 +26,7 @@ def get_sites() -> list[str]:
     ]
 
 
-def display_available_sites_menu(sites: list[str], console: Console) -> str:
+def prompt_user_for_site(sites: list[str], console: Console) -> str:
     if len(sites) == 1:
         return sites[0]
 
@@ -142,7 +142,7 @@ def main():
 
     try:
         repo: Repo = Repo(search_parent_directories=True)
-        selected_site = display_available_sites_menu(sites=get_sites(), console=console)
+        selected_site = prompt_user_for_site(sites=get_sites(), console=console)
         changed_files = check_last_commit(repo, console)
     except (InvalidGitRepositoryError, ValueError):
         console.print("\nMake sure you are in a check_mk git repository.", style="red")
