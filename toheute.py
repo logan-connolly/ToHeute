@@ -1,3 +1,14 @@
+#!/usr/bin/env -S uv run --quiet --no-project
+
+# ///script
+# requires-python = ">=3.12"
+# dependencies = [
+#    "gitpython>=3.1.44",
+#    "rich>=13.9.4",
+#    "ruff>=0.11.2",
+# ]
+# ///
+
 import subprocess
 import sys
 from pathlib import Path

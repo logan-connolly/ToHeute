@@ -1,7 +1,51 @@
-# Instructions
+# toheute
 
-- Install the required dependencies with > uv sync.
-- Create an executable file in usr/bin/<filename> and then add the following line. 
-    /path/to/this/repo/.venv/bin/python /path/to/this/repo/main.py
-- Now you should be able to run <filename> from your terminal.
-- Make sure you are running it in a check_mk repo.
+> a simple utility for copying in local changes to checkmk sites.
+
+## setup
+
+The `toheute.py` is a self-contained python script that can be run by [uv](). Since it is an executable, you just need to make sure that the executable can be found on your path. For example:
+
+```console
+ln -sf $PWD/toheute.py $HOME/.local/bin/toheute.py
+```
+
+Once it's there, simply run the following command from a checkmk repository:
+
+```console
+toheute.py
+```
+
+You will then be presented with a dialog for which site to patch your change to.
+
+## reload
+
+Once you've patched a change, make sure to reload the site with:
+
+```console
+OMD[heute]:~$ cmk -R
+```
+
+In the event that the change requires a GUI reload, also run:
+
+```console
+OMD[heute]:~$ omd reload apache
+```
+
+## development
+
+To create a dedicated virtual environment with required dependencies, run:
+
+```console
+uv venv
+uv pip sync requirements.txt
+source .venv/bin/activate[.fish]
+```
+
+## disclaimer
+
+This is not an all inclusive tool for checkmk development, but instead a simple one that meets most use cases.
+
+## acknowledgments
+
+The original script was created by @gavinmcguigan - all props should be directed his way.
