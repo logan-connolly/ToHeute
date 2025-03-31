@@ -23,7 +23,7 @@ def get_sites() -> list[str]:
     return [
         site.split(" ")[0]
         for site in [site_str for site_str in cmd_output.split("\n") if site_str]
-    ] + ["quit"]
+    ]
 
 
 def display_available_sites_menu(sites: list[str], console: Console) -> str:
@@ -35,14 +35,29 @@ def display_available_sites_menu(sites: list[str], console: Console) -> str:
     for n, site in enumerate(sites, 1):
         console.print(f"{n:<3}{site}")
     console.print("")
-    choice = Prompt.ask(
-        "Select a site",
-        console=console,
-        choices=[str(n) for n, _ in enumerate(sites, 1)],
-    )
-    if int(choice) == len(sites):
+    console.print("Enter 'q' to quit.")
+    console.print("")
+
+    choice = Prompt.ask("Select a site", console=console)
+
+    return get_site_from_choice(choice, sites, console)
+
+
+def get_site_from_choice(choice: str, sites: list[str], console: Console) -> str:
+    if choice == "q":
+        sys.exit(0)
+
+    if not choice.isdigit():
+        console.print("Invalid input.", style="red")
         sys.exit(1)
-    return sites[int(choice) - 1]
+
+    site_number = int(choice)
+
+    if site_number < 1 or site_number > len(sites):
+        console.print(f"Site number {site_number!r} is not available.", style="red")
+        sys.exit(1)
+
+    return sites[site_number - 1]
 
 
 def check_last_commit(repo: Repo, console: Console) -> list[Path]:
