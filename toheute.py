@@ -87,7 +87,7 @@ def show_changed_files(site: str, changed_files: list[Path], console: Console) -
 def copy_files(
     site: str, changed_files: list[Path], repo_dir: Path, console: Console
 ) -> None:
-    if (Prompt.ask(" Press Y to copy", console=console)) == "y":
+    if (Prompt.ask(" Press 'y' to copy", console=console)) == "y":
         with console.status("[blue]Copying files...", spinner="monkey"):
             for repo_file_path in changed_files:
                 changed_file_path = Path(repo_dir / repo_file_path)
