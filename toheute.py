@@ -88,19 +88,20 @@ def show_changed_files(site: str, changed_files: list[Path], console: Console) -
 def copy_files(
     site: str, changed_files: list[Path], repo_dir: Path, console: Console
 ) -> None:
-    if (Prompt.ask(" Press 'y' to copy", console=console)) == "y":
-        with console.status("[blue]Copying files...", spinner="monkey"):
-            for repo_file_path in changed_files:
-                changed_file_path = Path(repo_dir / repo_file_path)
-                site_file_path = (
-                    Path(f"/omd/sites/{site}/lib/python3") / repo_file_path
-                )  # TODO: Some files don't map exactly the same as the repo
-                result = subprocess.run(
-                    ["sudo", "cp", "-R", changed_file_path, site_file_path],
-                    capture_output=True,
-                    text=True,
-                )
-                print_copy_result(site_file_path.name, result, console)
+    if Prompt.ask(" Press 'y' to copy", console=console) != "y":
+        return
+
+    with console.status("[blue]Copying files...", spinner="monkey"):
+        for repo_file_path in changed_files:
+            changed_file_path = Path(repo_dir / repo_file_path)
+            # TODO: Some files don't map exactly the same as the repo
+            site_file_path = Path(f"/omd/sites/{site}/lib/python3") / repo_file_path
+            result = subprocess.run(
+                ["sudo", "cp", "-R", changed_file_path, site_file_path],
+                capture_output=True,
+                text=True,
+            )
+            print_copy_result(site_file_path.name, result, console)
 
 
 def print_copy_result(name: str, result: CompletedProcess, console: Console) -> None:
