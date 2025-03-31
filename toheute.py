@@ -12,6 +12,7 @@
 import subprocess
 import sys
 from pathlib import Path
+from subprocess import CompletedProcess
 
 from git import GitConfigParser, InvalidGitRepositoryError, PathLike, Repo
 from rich.console import Console
@@ -99,13 +100,15 @@ def copy_files(
                     capture_output=True,
                     text=True,
                 )
-                if result.returncode != 0:
-                    console.print(
-                        f"\n Error copying file: {result.stderr}", style="red"
-                    )
-                    console.print(f"  '{site_file_path.name}' ❌", style="red")
-                else:
-                    console.print(f"  '{site_file_path.name}' ✔️", style="green")
+                print_copy_result(site_file_path.name, result, console)
+
+
+def print_copy_result(name: str, result: CompletedProcess, console: Console) -> None:
+    if result.returncode != 0:
+        console.print(f"\n Error copying file: {result.stderr}", style="red")
+        console.print(f"  '{name}' ❌", style="red")
+    else:
+        console.print(f"  '{name}' ✔️", style="green")
 
 
 def show_and_copy_files(
