@@ -19,11 +19,8 @@ from rich.prompt import Prompt
 
 
 def get_sites() -> list[str]:
-    cmd_output = subprocess.check_output(["omd", "sites"]).decode("utf-8")
-    return [
-        site.split(" ")[0]
-        for site in [site_str for site_str in cmd_output.split("\n") if site_str]
-    ]
+    raw_sites = subprocess.check_output(["omd", "sites", "--bare"]).decode("utf-8")
+    return [site for site in raw_sites.rstrip("\n").split("\n")]
 
 
 def prompt_user_for_site(sites: list[str], console: Console) -> str:
