@@ -123,6 +123,8 @@ def show_and_copy_files(
 
 def main():
     console = Console()
+    console.clear()
+
     try:
         repo: Repo = Repo(search_parent_directories=True)
         selected_site = display_available_sites_menu(sites=get_sites(), console=console)
