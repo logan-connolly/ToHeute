@@ -38,7 +38,7 @@ To create a dedicated virtual environment with required dependencies, run:
 
 ```console
 uv venv --python 3.12
-uv pip sync requirements.txt
+uv pip install gitpython rich
 source .venv/bin/activate[.fish]
 ```
 
