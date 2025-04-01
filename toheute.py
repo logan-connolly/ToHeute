@@ -5,7 +5,6 @@
 # dependencies = [
 #    "gitpython>=3.1.44",
 #    "rich>=13.9.4",
-#    "ruff>=0.11.2",
 # ]
 # ///
 
