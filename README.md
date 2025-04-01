@@ -37,7 +37,7 @@ OMD[heute]:~$ omd reload apache
 To create a dedicated virtual environment with required dependencies, run:
 
 ```console
-uv venv
+uv venv --python 3.12
 uv pip sync requirements.txt
 source .venv/bin/activate[.fish]
 ```
