@@ -9,154 +9,165 @@
 # ]
 # ///
 
+import dataclasses
 import subprocess
 import sys
 from pathlib import Path
 from subprocess import CompletedProcess
+from typing import Literal, NoReturn, Self
 
-from git import GitConfigParser, InvalidGitRepositoryError, PathLike, Repo
+from git import GitConfigParser, InvalidGitRepositoryError, Repo
 from rich.console import Console
 from rich.prompt import Prompt
+from rich.status import Status
 
 
-def get_sites() -> list[str]:
+def main():
+    console = AppConsole()
+
+    try:
+        repo: Repo = Repo(search_parent_directories=True)
+    except InvalidGitRepositoryError:
+        console.exit("Make sure you're in a check_mk git repository.", variant="danger")
+
+    if (repo_dir := repo.working_tree_dir) is None:
+        console.exit("Repository directory is empty.", variant="danger")
+
+    sites = get_site_names()
+    console.print_sites_info(sites)
+    site = select_site(sites=sites, console=console)
+
+    last_commit = LastCommit.from_repo(repo)
+    username = read_username_from_git_config(repo)
+    console.print_commit_info(site, last_commit, username)
+
+    if console.prompt_user(" Press 'y' to copy") != "y":
+        console.exit("Nothing to do...", variant="info")
+
+    with console.file_copying_progress():
+        for fpath in last_commit.filepaths:
+            src_path = repo_dir / fpath
+            site_path = Path(f"/omd/sites/{site}/lib/python3") / fpath
+            result = copy_file(src_path, site_path)
+            console.print_copy_result(site_path.name, result)
+
+
+@dataclasses.dataclass
+class LastCommit:
+    author: str
+    time: str
+    message: str
+    filepaths: list[Path]
+
+    @classmethod
+    def from_repo(cls, repo: Repo) -> Self:
+        filepaths = [
+            Path(f)
+            for f in repo.head.commit.stats.files.keys()
+            if not str(f).startswith((".werks", "bin"))
+        ]
+        return cls(
+            author=repo.head.commit.author.name,
+            time=repo.head.commit.committed_datetime.strftime("%d/%m/%Y, %H:%M:%S"),
+            message=repo.head.commit.message,
+            filepaths=filepaths,
+        )
+
+
+Variant = Literal["success", "danger", "info"]
+
+
+class AppConsole:
+    def __init__(self) -> None:
+        self.console = Console()
+        self.console.clear()
+
+    def exit(self, msg: str, *, variant: Variant) -> NoReturn:
+        match variant:
+            case "success":
+                style, code = "green", 0
+            case "danger":
+                style, code = "red", 1
+            case "info":
+                style, code = "blue", 0
+
+        self.console.print(msg, style=style, new_line_start=True)
+        sys.exit(code)
+
+    def prompt_user(self, msg: str) -> str:
+        return Prompt.ask(msg, console=self.console)
+
+    def print_sites_info(self, sites: list[str]) -> None:
+        self.console.print("\n")
+        self.console.rule("Available sites")
+        for n, site in enumerate(sites, 1):
+            self.console.print(f"{n:<3}{site}")
+        self.console.print("")
+        self.console.print("Enter 'q' to quit.")
+        self.console.print("")
+
+    def print_commit_info(self, site: str, commit: LastCommit, username: str) -> None:
+        msg = f"\nLast commit: {commit.author}\t{commit.time}\n\n{commit.message:.>30}"
+        style = "green" if commit.author == username else "red"
+
+        self.console.print(msg, style=style)
+
+        if not commit.filepaths:
+            self.exit("No changed files.", variant="info")
+
+        self.console.print(f" Update the following files on site '{site}'")
+        for repo_file_path in commit.filepaths:
+            self.console.print(
+                f"  '{Path(f'/omd/sites/{site}/lib/python3') / repo_file_path}'"
+            )
+        self.console.print("\n")
+
+    def file_copying_progress(self) -> Status:
+        return self.console.status("[blue]Copying files...", spinner="monkey")
+
+    def print_copy_result(self, name: str, result: CompletedProcess) -> None:
+        if result.returncode != 0:
+            self.console.print(f"\n Error copying file: {result.stderr}", style="red")
+            self.console.print(f"  '{name}' ❌", style="red")
+        else:
+            self.console.print(f"  '{name}' ✔️", style="green")
+
+
+def get_site_names() -> list[str]:
     raw_sites = subprocess.check_output(["omd", "sites", "--bare"]).decode("utf-8")
     return [site for site in raw_sites.rstrip("\n").split("\n")]
 
 
-def get_site_from_user(sites: list[str], console: Console) -> str:
+def select_site(sites: list[str], console: AppConsole) -> str:
     if len(sites) == 1:
         return sites[0]
 
-    console.print("\n")
-    console.rule("Available sites")
-    for n, site in enumerate(sites, 1):
-        console.print(f"{n:<3}{site}")
-    console.print("")
-    console.print("Enter 'q' to quit.")
-    console.print("")
+    choice = console.prompt_user("Select a site")
 
-    choice = Prompt.ask("Select a site", console=console)
-
-    return get_site_from_choice(choice, sites, console)
-
-
-def get_site_from_choice(choice: str, sites: list[str], console: Console) -> str:
     if choice == "q":
-        sys.exit(0)
+        console.exit("See you soon :)", variant="success")
 
     if not choice.isdigit():
-        console.print("Invalid input.", style="red")
-        sys.exit(1)
+        console.exit("Invalid input.", variant="danger")
 
     site_number = int(choice)
 
     if site_number < 1 or site_number > len(sites):
-        console.print(f"Site number {site_number!r} is not available.", style="red")
-        sys.exit(1)
+        console.exit(f"Site number {site_number!r} is not available.", variant="danger")
 
     return sites[site_number - 1]
 
 
-def check_last_commit(repo: Repo, console: Console) -> list[Path]:
+def read_username_from_git_config(repo: Repo) -> str:
     repo_config: GitConfigParser = repo.config_reader()
-    git_username = repo_config.get_value(section="user", option="name")
-    last_commit_time = repo.head.commit.committed_datetime.strftime(
-        "%d/%m/%Y, %H:%M:%S"
-    )
-    last_commit_username = repo.head.commit.author.name
-    last_commit_msg = repo.head.commit.message
-
-    console.print(
-        f"\nLast commit: {last_commit_username}\t{last_commit_time}\n\n{last_commit_msg:.>30}",
-        style="green" if last_commit_username == git_username else "red",
-    )
-    return [
-        Path(f)
-        for f, _ in repo.head.commit.stats.files.items()
-        if not str(f).startswith((".werks", "bin"))
-    ]
+    username = repo_config.get_value(section="user", option="name")
+    assert isinstance(username, str)
+    return username
 
 
-def show_changed_files(site: str, changed_files: list[Path], console: Console) -> None:
-    console.print(f" Update the following files on site '{site}'")
-    for repo_file_path in changed_files:
-        console.print(f"  '{Path(f'/omd/sites/{site}/lib/python3') / repo_file_path}'")
-    console.print("\n")
-
-
-def copy_files(
-    site: str, changed_files: list[Path], repo_dir: Path, console: Console
-) -> None:
-    if Prompt.ask(" Press 'y' to copy", console=console) != "y":
-        return
-
-    with console.status("[blue]Copying files...", spinner="monkey"):
-        for repo_file_path in changed_files:
-            changed_file_path = Path(repo_dir / repo_file_path)
-            # TODO: Some files don't map exactly the same as the repo
-            site_file_path = Path(f"/omd/sites/{site}/lib/python3") / repo_file_path
-            result = subprocess.run(
-                ["sudo", "cp", "-R", changed_file_path, site_file_path],
-                capture_output=True,
-                text=True,
-            )
-            print_copy_result(site_file_path.name, result, console)
-
-
-def print_copy_result(name: str, result: CompletedProcess, console: Console) -> None:
-    if result.returncode != 0:
-        console.print(f"\n Error copying file: {result.stderr}", style="red")
-        console.print(f"  '{name}' ❌", style="red")
-    else:
-        console.print(f"  '{name}' ✔️", style="green")
-
-
-def show_and_copy_files(
-    site: str,
-    changed_files: list[Path],
-    repo_dir: PathLike | None,
-    console: Console,
-) -> None:
-    if not changed_files:
-        console.print("No changed files.", style="blue")
-        return
-
-    assert repo_dir is not None
-
-    show_changed_files(
-        site=site,
-        changed_files=changed_files,
-        console=console,
-    )
-    copy_files(
-        site=site,
-        changed_files=changed_files,
-        repo_dir=Path(repo_dir),
-        console=console,
-    )
-
-
-def main():
-    console = Console()
-    console.clear()
-
-    try:
-        repo: Repo = Repo(search_parent_directories=True)
-        selected_site = get_site_from_user(sites=get_sites(), console=console)
-        changed_files = check_last_commit(repo, console)
-    except (InvalidGitRepositoryError, ValueError):
-        console.print("\nMake sure you are in a check_mk git repository.", style="red")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        sys.exit(0)
-
-    show_and_copy_files(
-        site=selected_site,
-        changed_files=changed_files,
-        repo_dir=repo.working_tree_dir,
-        console=console,
-    )
+def copy_file(src_path: Path, site_path: Path) -> CompletedProcess:
+    args = ["sudo", "cp", "-R", src_path, site_path]
+    return subprocess.run(args, capture_output=True, text=True)
 
 
 if __name__ == "__main__":
