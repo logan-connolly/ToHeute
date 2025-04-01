@@ -48,4 +48,4 @@ This is not an all inclusive tool for checkmk development, but instead a simple 
 
 ## acknowledgments
 
-The original script was created by [@gavinmcguigan](https://github.com/gavinmcguigan) - all props should be directed his way.
+The original [implementation][https://github.com/gavinmcguigan/ToHeute] was created by [@gavinmcguigan](https://github.com/gavinmcguigan) - all props should be directed his way.
