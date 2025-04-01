@@ -34,7 +34,6 @@ def main():
         console.exit("Repository directory is empty.", variant="danger")
 
     sites = get_site_names()
-    console.print_sites_info(sites)
     site = select_site(sites=sites, console=console)
 
     last_commit = LastCommit.from_repo(repo)
@@ -98,29 +97,22 @@ class AppConsole:
         return Prompt.ask(msg, console=self.console)
 
     def print_sites_info(self, sites: list[str]) -> None:
-        self.console.print("\n")
-        self.console.rule("Available sites")
+        self.console.print("Available sites:", style="green", new_line_start=True, end="\n\n")
         for n, site in enumerate(sites, 1):
-            self.console.print(f"{n:<3}{site}")
-        self.console.print("")
-        self.console.print("Enter 'q' to quit.")
-        self.console.print("")
+            self.console.print(f"  {n:<3}{site}")
+        self.console.print("  Enter 'q' to quit.", new_line_start=True, end="\n\n")
 
     def print_commit_info(self, site: str, commit: LastCommit, username: str) -> None:
         msg = f"\nLast commit: {commit.author}\t{commit.time}\n\n{commit.message:.>30}"
-        style = "green" if commit.author == username else "red"
-
-        self.console.print(msg, style=style)
+        self.console.print(msg, style="green" if commit.author == username else "red")
 
         if not commit.filepaths:
             self.exit("No changed files.", variant="info")
 
         self.console.print(f" Update the following files on site '{site}'")
-        for repo_file_path in commit.filepaths:
-            self.console.print(
-                f"  '{Path(f'/omd/sites/{site}/lib/python3') / repo_file_path}'"
-            )
-        self.console.print("\n")
+        for fp in commit.filepaths:
+            self.console.print(f"  '{Path(f'/omd/sites/{site}/lib/python3') / fp}'")
+        self.console.print()
 
     def file_copying_progress(self) -> Status:
         return self.console.status("[blue]Copying files...", spinner="monkey")
@@ -142,6 +134,7 @@ def select_site(sites: list[str], console: AppConsole) -> str:
     if len(sites) == 1:
         return sites[0]
 
+    console.print_sites_info(sites)
     choice = console.prompt_user("Select a site")
 
     if choice == "q":
