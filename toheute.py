@@ -49,6 +49,17 @@ def main():
             result = copy_file(src_path, site_path)
             console.print_copy_result(str(site_path), result)
 
+    with console.progress_spinner("Reloading services"):
+        site_result = execute_site_command(site, "cmk -R")
+        console.print_reload_result("CMK restart", site_result)
+
+        if last_commit.has_gui_change():
+            gui_result = execute_site_command(site, "omd reload apache")
+            console.print_reload_result("Apache reload", gui_result)
+
+            ui_scheduler_result = execute_site_command(site, "omd restart ui-job-scheduler")
+            console.print_reload_result("UI job scheduler restart", ui_scheduler_result)
+
 
 @dataclasses.dataclass
 class LastCommit:
@@ -71,6 +82,9 @@ class LastCommit:
 
     def get_invalid_paths(self) -> list[Path]:
         return [fp for fp in self.filepaths if not self._is_valid_path(fp)]
+
+    def has_gui_change(self) -> bool:
+        return any(str(fpath).startswith("cmk/gui") for fpath in self.get_valid_paths())
 
     def _is_valid_path(self, fpath: Path) -> bool:
         return not str(fpath).startswith((".werks", "bin", "packages"))
@@ -140,6 +154,12 @@ class AppConsole:
         else:
             self.console.print(f"  '{name}' ✔️", style="green")
 
+    def print_reload_result(self, label: str, result: CompletedProcess) -> None:
+        self.console.rule(label)
+        if result.returncode != 0:
+            self.console.print(f"❌  {result.stderr}", style="red")
+        self.console.print(result.stdout, style="dim")
+
 
 def get_site_names() -> list[str]:
     raw_sites = subprocess.check_output(["omd", "sites", "--bare"]).decode("utf-8")
@@ -177,6 +197,11 @@ def read_username_from_git_config(repo: Repo) -> str:
 def copy_file(src_path: Path, site_path: Path) -> CompletedProcess:
     args = ["sudo", "cp", "-R", src_path, site_path]
     return subprocess.run(args, capture_output=True, text=True)
+
+
+def execute_site_command(site: str, cmd: str) -> CompletedProcess:
+    reload_cmd = f"sudo --login -u {site} -- {cmd}"
+    return subprocess.run(reload_cmd.split(), capture_output=True, text=True)
 
 
 if __name__ == "__main__":
