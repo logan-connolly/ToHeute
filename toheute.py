@@ -39,15 +39,15 @@ def main():
     username = read_username_from_git_config(repo)
     console.print_commit_info(site, last_commit, username)
 
-    if console.prompt_user(" Press 'y' to copy") != "y":
+    if console.prompt_user("Press 'y' to copy") != "y":
         console.exit("Nothing to do...", variant="info")
 
     with console.file_copying_progress():
-        for fpath in last_commit.filepaths:
+        for fpath in last_commit.get_valid_paths():
             src_path = repo_dir / fpath
             site_path = Path(f"/omd/sites/{site}/lib/python3") / fpath
             result = copy_file(src_path, site_path)
-            console.print_copy_result(site_path.name, result)
+            console.print_copy_result(str(site_path), result)
 
 
 @dataclasses.dataclass
@@ -59,17 +59,21 @@ class LastCommit:
 
     @classmethod
     def from_repo(cls, repo: Repo) -> Self:
-        filepaths = [
-            Path(f)
-            for f in repo.head.commit.stats.files.keys()
-            if not str(f).startswith((".werks", "bin"))
-        ]
         return cls(
             author=repo.head.commit.author.name,
             time=repo.head.commit.committed_datetime.strftime("%d/%m/%Y, %H:%M:%S"),
             message=repo.head.commit.message,
-            filepaths=filepaths,
+            filepaths=[Path(f) for f in repo.head.commit.stats.files.keys()],
         )
+
+    def get_valid_paths(self) -> list[Path]:
+        return [fp for fp in self.filepaths if self._is_valid_path(fp)]
+
+    def get_invalid_paths(self) -> list[Path]:
+        return [fp for fp in self.filepaths if not self._is_valid_path(fp)]
+
+    def _is_valid_path(self, fpath: Path) -> bool:
+        return not str(fpath).startswith((".werks", "bin", "packages"))
 
 
 Variant = Literal["success", "danger", "info"]
@@ -96,21 +100,33 @@ class AppConsole:
         return Prompt.ask(msg, console=self.console)
 
     def print_sites_info(self, sites: list[str]) -> None:
-        self.console.print("Available sites:", style="green", new_line_start=True, end="\n\n")
+        self.console.rule("Select a site")
+        self.console.print("Available sites:", new_line_start=True, end="\n\n")
         for n, site in enumerate(sites, 1):
             self.console.print(f"  {n:<3}{site}")
-        self.console.print("  Enter 'q' to quit.", new_line_start=True, end="\n\n")
+        self.console.print("  Enter 'q' to quit.", end="\n\n")
 
     def print_commit_info(self, site: str, commit: LastCommit, username: str) -> None:
-        msg = f"\nLast commit: {commit.author}\t{commit.time}\n\n{commit.message:.>30}"
-        self.console.print(msg, style="green" if commit.author == username else "red")
+        self.console.rule("Last commit")
+        self.console.print(
+            f"\n{commit.author} ({commit.time})\n",
+            style="black" if commit.author == username else "red",
+        )
+        self.console.print(f"{commit.message:.>30}", style="italic")
 
         if not commit.filepaths:
             self.exit("No changed files.", variant="info")
 
-        self.console.print(f" Update the following files on site '{site}'")
-        for fp in commit.filepaths:
-            self.console.print(f"  '{Path(f'/omd/sites/{site}/lib/python3') / fp}'")
+        self.console.rule("Detected file changes")
+        self.console.print(f"\nUpdate the following files on site '{site}':\n")
+        for fp in commit.get_valid_paths():
+            self.console.print(f"  {Path(f'/omd/sites/{site}/lib/python3') / fp}")
+
+        if invalid_paths := commit.get_invalid_paths():
+            self.console.print("\nThe following paths cannot be copied:\n")
+            for fp in invalid_paths:
+                self.console.print(f"  {fp}", style="yellow")
+
         self.console.print()
 
     def file_copying_progress(self) -> Status:
