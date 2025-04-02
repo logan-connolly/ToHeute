@@ -18,20 +18,6 @@ toheute.py
 
 You will then be presented with a dialog for which site to patch your change to.
 
-## reload
-
-Once you've patched a change, make sure to reload the site with:
-
-```console
-OMD[heute]:~$ cmk -R
-```
-
-In the event that the change requires a GUI reload, also run:
-
-```console
-OMD[heute]:~$ omd reload apache
-```
-
 ## development
 
 To create a dedicated virtual environment with required dependencies, run:
