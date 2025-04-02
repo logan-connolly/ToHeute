@@ -42,7 +42,7 @@ def main():
     if console.prompt_user("Press 'y' to copy") != "y":
         console.exit("Nothing to do...", variant="info")
 
-    with console.file_copying_progress():
+    with console.progress_spinner("Copying files"):
         for fpath in last_commit.get_valid_paths():
             src_path = repo_dir / fpath
             site_path = Path(f"/omd/sites/{site}/lib/python3") / fpath
@@ -99,6 +99,10 @@ class AppConsole:
     def prompt_user(self, msg: str) -> str:
         return Prompt.ask(msg, console=self.console)
 
+    def progress_spinner(self, label: str) -> Status:
+        self.console.print()
+        return self.console.status(f"[blue]{label}...", spinner="monkey")
+
     def print_sites_info(self, sites: list[str]) -> None:
         self.console.rule("Select a site")
         self.console.print("Available sites:", new_line_start=True, end="\n\n")
@@ -128,9 +132,6 @@ class AppConsole:
                 self.console.print(f"  {fp}", style="yellow")
 
         self.console.print()
-
-    def file_copying_progress(self) -> Status:
-        return self.console.status("[blue]Copying files...", spinner="monkey")
 
     def print_copy_result(self, name: str, result: CompletedProcess) -> None:
         if result.returncode != 0:
