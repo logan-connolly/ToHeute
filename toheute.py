@@ -87,7 +87,7 @@ class LastCommit:
         return any(str(fpath).startswith("cmk/gui") for fpath in self.get_valid_paths())
 
     def _is_valid_path(self, fpath: Path) -> bool:
-        return not str(fpath).startswith((".werks", "bin", "packages"))
+        return not str(fpath).startswith((".werks", "bin", "packages", "tests"))
 
 
 Variant = Literal["success", "danger", "info"]
