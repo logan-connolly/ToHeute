@@ -24,7 +24,7 @@ INVALID_PATH_PREFIXES = (".werks", "bin", "packages", "tests")
 """Paths starting with these prefixes should not be copied into site."""
 
 
-def main():
+def main() -> None:
     console = AppConsole()
 
     try:
