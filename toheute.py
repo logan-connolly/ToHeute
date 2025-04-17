@@ -220,4 +220,7 @@ def execute_site_command(site: str, cmd: str) -> CompletedProcess:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
