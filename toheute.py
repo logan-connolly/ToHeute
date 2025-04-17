@@ -20,6 +20,9 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.status import Status
 
+INVALID_PATH_PREFIXES = (".werks", "bin", "packages", "tests")
+"""Paths starting with these prefixes should not be copied into site."""
+
 
 def main():
     console = AppConsole()
@@ -57,7 +60,9 @@ def main():
             gui_result = execute_site_command(site, "omd reload apache")
             console.print_reload_result("Apache reload", gui_result)
 
-            ui_scheduler_result = execute_site_command(site, "omd restart ui-job-scheduler")
+            ui_scheduler_result = execute_site_command(
+                site, "omd restart ui-job-scheduler"
+            )
             console.print_reload_result("UI job scheduler restart", ui_scheduler_result)
 
 
@@ -87,7 +92,7 @@ class LastCommit:
         return any(str(fpath).startswith("cmk/gui") for fpath in self.get_valid_paths())
 
     def _is_valid_path(self, fpath: Path) -> bool:
-        return not str(fpath).startswith((".werks", "bin", "packages", "tests"))
+        return not str(fpath).startswith(INVALID_PATH_PREFIXES)
 
 
 Variant = Literal["success", "danger", "info"]
@@ -193,12 +198,14 @@ def read_username_from_git_config(repo: Repo) -> str:
     assert isinstance(username, str)
     return username
 
+
 def get_site_path(site: str, fpath: Path) -> Path:
     match fpath:
         case path if str(path).startswith("active_checks"):
             return Path(f"/omd/sites/{site}/lib/nagios/plugins") / fpath.name
         case _:
             return Path(f"/omd/sites/{site}/lib/python3") / fpath
+
 
 def copy_file(src_path: Path, site_path: Path) -> CompletedProcess:
     args = ["sudo", "cp", "-R", src_path, site_path]
