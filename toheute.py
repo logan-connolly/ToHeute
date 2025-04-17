@@ -45,7 +45,7 @@ def main():
     with console.progress_spinner("Copying files"):
         for fpath in last_commit.get_valid_paths():
             src_path = repo_dir / fpath
-            site_path = Path(f"/omd/sites/{site}/lib/python3") / fpath
+            site_path = get_site_path(site, fpath)
             result = copy_file(src_path, site_path)
             console.print_copy_result(str(site_path), result)
 
@@ -193,6 +193,12 @@ def read_username_from_git_config(repo: Repo) -> str:
     assert isinstance(username, str)
     return username
 
+def get_site_path(site: str, fpath: Path) -> Path:
+    match fpath:
+        case path if str(path).startswith("active_checks"):
+            return Path(f"/omd/sites/{site}/lib/nagios/plugins") / fpath.name
+        case _:
+            return Path(f"/omd/sites/{site}/lib/python3") / fpath
 
 def copy_file(src_path: Path, site_path: Path) -> CompletedProcess:
     args = ["sudo", "cp", "-R", src_path, site_path]
