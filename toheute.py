@@ -42,11 +42,13 @@ def main():
     username = read_username_from_git_config(repo)
     console.print_commit_info(site, last_commit, username)
 
-    if console.prompt_user("Press 'y' to copy") != "y":
+    valid_paths = last_commit.get_valid_paths()
+
+    if not valid_paths or console.prompt_user("Press 'y' to copy") != "y":
         console.exit("Nothing to do...", variant="info")
 
     with console.progress_spinner("Copying files"):
-        for fpath in last_commit.get_valid_paths():
+        for fpath in valid_paths:
             src_path = repo_dir / fpath
             site_path = get_site_path(site, fpath)
             result = copy_file(src_path, site_path)
