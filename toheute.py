@@ -8,6 +8,7 @@
 # ]
 # ///
 
+import contextlib
 import dataclasses
 import subprocess
 import sys
@@ -220,7 +221,5 @@ def execute_site_command(site: str, cmd: str) -> CompletedProcess:
 
 
 if __name__ == "__main__":
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         main()
-    except KeyboardInterrupt:
-        pass
