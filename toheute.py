@@ -48,9 +48,9 @@ def main():
         console.exit("Nothing to do...", variant="info")
 
     with console.progress_spinner("Copying files"):
-        for fpath in valid_paths:
-            src_path = repo_dir / fpath
-            site_path = get_site_path(site, fpath)
+        for valid_path in valid_paths:
+            src_path = repo_dir / valid_path
+            site_path = get_site_path(site, valid_path)
             result = copy_file(src_path, site_path)
             console.print_copy_result(str(site_path), result)
 
