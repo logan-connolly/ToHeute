@@ -45,7 +45,10 @@ def main() -> None:
 
     valid_paths = last_commit.get_valid_paths()
 
-    if not valid_paths or console.prompt_user("Press 'y' to copy") != "y":
+    if (
+        not valid_paths
+        or console.prompt_user("Copy", default="y", choices=["y", "n"]) != "y"
+    ):
         console.exit("Nothing to do...", variant="info")
 
     with console.progress_spinner("Copying files"):
@@ -118,19 +121,22 @@ class AppConsole:
         self.console.print(msg, style=style, new_line_start=True)
         sys.exit(code)
 
-    def prompt_user(self, msg: str) -> str:
-        return Prompt.ask(msg, console=self.console)
+    def prompt_user(
+        self, msg: str, *, default: str, choices: list[str] | None = None
+    ) -> str:
+        return Prompt.ask(msg, console=self.console, default=default, choices=choices)
 
     def progress_spinner(self, label: str) -> Status:
         self.console.print()
         return self.console.status(f"[blue]{label}...", spinner="monkey")
 
-    def print_sites_info(self, sites: list[str]) -> None:
+    def print_sites_info(self, site_mapping: dict[str, str], default: str = "") -> None:
         self.console.rule("Select a site")
         self.console.print("Available sites:", new_line_start=True, end="\n\n")
-        for n, site in enumerate(sites, 1):
-            self.console.print(f"  {n:<3}{site}")
-        self.console.print("  Enter 'q' to quit.", end="\n\n")
+        for site, idx in site_mapping.items():
+            color = "black" if site == default else "grey50"
+            self.console.print(f"  {idx:<3}{site}", style=color)
+        self.console.print()
 
     def print_commit_info(self, site: str, commit: LastCommit, username: str) -> None:
         self.console.rule("Last commit")
@@ -174,25 +180,30 @@ def get_site_names() -> list[str]:
     return [site for site in raw_sites.rstrip("\n").split("\n")]
 
 
+def get_site_from_environment() -> str:
+    if not (site_path := Path(".site")).exists():
+        return ""
+    return site_path.read_text().strip()
+
+
 def select_site(sites: list[str], console: AppConsole) -> str:
     if len(sites) == 1:
         return sites[0]
 
-    console.print_sites_info(sites)
-    choice = console.prompt_user("Select a site")
+    site_mapping = {site: str(idx) for idx, site in enumerate(sites, 1)}
+    site_environment = get_site_from_environment()
 
-    if choice == "q":
-        console.exit("See you soon :)", variant="success")
+    console.print_sites_info(site_mapping, site_environment)
 
-    if not choice.isdigit():
-        console.exit("Invalid input.", variant="danger")
-
-    site_number = int(choice)
-
-    if site_number < 1 or site_number > len(sites):
-        console.exit(f"Site number {site_number!r} is not available.", variant="danger")
-
-    return sites[site_number - 1]
+    match choice := console.prompt_user(
+        "Select a site",
+        default=site_mapping.get(site_environment, "1"),
+        choices=list(site_mapping.values()),
+    ):
+        case "q":
+            console.exit("See you soon :)", variant="success")
+        case _:
+            return sites[int(choice) - 1]
 
 
 def read_username_from_git_config(repo: Repo) -> str:
