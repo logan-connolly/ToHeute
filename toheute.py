@@ -47,7 +47,7 @@ def main() -> None:
 
     if (
         not valid_paths
-        or console.prompt_user("Copy", default="y", choices=["y", "n"]) != "y"
+        or console.prompt_user("Proceed", default="y", choices=["y", "n"]) != "y"
     ):
         console.exit("Nothing to do...", variant="info")
 
@@ -83,7 +83,7 @@ class LastCommit:
     def from_repo(cls, repo: Repo) -> Self:
         return cls(
             author=repo.head.commit.author.name,
-            time=repo.head.commit.committed_datetime.strftime("%d/%m/%Y, %H:%M:%S"),
+            time=repo.head.commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
             message=repo.head.commit.message,
             filepaths=[Path(f) for f in repo.head.commit.stats.files.keys()],
         )
@@ -150,7 +150,7 @@ class AppConsole:
             self.exit("No changed files.", variant="info")
 
         self.console.rule("Detected file changes")
-        self.console.print(f"\nUpdate the following files on site '{site}':\n")
+        self.console.print(f"\nSync the following files in '{site}' site:\n")
         for fp in commit.get_valid_paths():
             self.console.print(f"  {Path(f'/omd/sites/{site}/lib/python3') / fp}")
 
