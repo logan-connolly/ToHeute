@@ -35,7 +35,7 @@ def main() -> None:
 
     site_name = SiteManager(console).select_site()
 
-    repo = GitRepository(site_name, console)
+    repo = GitRepository(console)
     commit = repo.get_last_commit()
     repo.print_commit_info(commit)
 
@@ -46,7 +46,7 @@ def main() -> None:
         console.exit("No paths to copy.", style="success")
 
     with console.in_progress("Syncing files"):
-        FileManager(site_name, repo.directory, valid_paths, console).sync()
+        FileManager(site_name, valid_paths, console).sync()
 
     site = SiteController(site_name, console)
     with console.in_progress("Reloading services"):
@@ -177,12 +177,9 @@ class Commit:
 
 
 class GitRepository:
-    def __init__(self, site: str, console: AppConsole) -> None:
-        self._site = site
+    def __init__(self, console: AppConsole) -> None:
         self._console = console
-
         self._git = self._load_git_repository()
-        self._site_python_dir = Path(f"/omd/sites/{self._site}/lib/python3")
 
     def get_last_commit(self) -> Commit:
         return Commit(
@@ -201,19 +198,16 @@ class GitRepository:
             self._console.exit("No changed files.", style="success")
 
         self._console.heading("Sync files")
-        self._console.print(f"Sync files to '{self._site}' site:", pad="extra")
+
+        self._console.print("The following files will be copied:", pad="extra")
         for fp in commit.get_valid_paths():
-            self._console.print(f"{self._site_python_dir / fp}", style="muted")
+            self._console.print(str(fp), style="muted")
 
         if invalid_paths := commit.get_invalid_paths():
-            self._console.print("Unable to copy the following paths:", pad="extra")
+            self._console.print("Unable to sync the following files:", pad="extra")
             for fp in invalid_paths:
                 self._console.print(str(fp), style="warn")
         self._console.print("")
-
-    @property
-    def directory(self) -> Path:
-        return Path(self._git.working_tree_dir or ".")
 
     def _load_git_repository(self) -> Repo:
         try:
@@ -223,19 +217,15 @@ class GitRepository:
 
 
 class FileManager:
-    def __init__(
-        self, site: str, repo_dir: Path, paths: list[Path], console: AppConsole
-    ) -> None:
+    def __init__(self, site: str, paths: list[Path], console: AppConsole) -> None:
         self._site = site
-        self._repo_dir = repo_dir
         self._paths = paths
         self._console = console
 
     def sync(self) -> None:
         for path in self._paths:
-            src_path = self._repo_dir / path
             site_path = self._get_site_path(path)
-            result = self._copy(src_path, site_path)
+            result = self._copy(path, site_path)
             self._print_result(site_path, result)
 
     def _get_site_path(self, fpath: Path) -> Path:
