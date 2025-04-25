@@ -14,79 +14,154 @@ import subprocess
 import sys
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Literal, NoReturn, Self
+from typing import Literal, NoReturn
 
-from git import GitConfigParser, InvalidGitRepositoryError, Repo
+from git import InvalidGitRepositoryError, Repo
 from rich.console import Console
 from rich.prompt import Prompt
+from rich.padding import Padding, PaddingDimensions
 from rich.status import Status
 
 INVALID_PATH_PREFIXES = (".werks", "bin", "packages", "tests")
 """Paths starting with these prefixes should not be copied into site."""
 
 
+type PadVariant = Literal["extra"] | None
+type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
+
+
 def main() -> None:
     console = AppConsole()
 
-    try:
-        repo: Repo = Repo(search_parent_directories=True)
-    except InvalidGitRepositoryError:
-        console.exit("Make sure you're in a check_mk git repository.", variant="danger")
+    site_name = SiteManager(console).select_site()
 
-    if (repo_dir := repo.working_tree_dir) is None:
-        console.exit("Repository directory is empty.", variant="danger")
+    repo = GitRepository(site_name, console)
+    commit = repo.get_last_commit()
+    repo.print_commit_info(commit)
 
-    sites = get_site_names()
-    site = select_site(sites=sites, console=console)
+    if not (valid_paths := commit.get_valid_paths()):
+        console.exit("No paths available to copy.", style="warn")
 
-    last_commit = LastCommit.from_repo(repo)
-    username = read_username_from_git_config(repo)
-    console.print_commit_info(site, last_commit, username)
+    if not console.confirm():
+        console.exit("No paths to copy.", style="success")
 
-    valid_paths = last_commit.get_valid_paths()
+    with console.in_progress("Syncing files"):
+        FileSyncer(site_name, repo.directory, valid_paths, console).sync()
 
-    if (
-        not valid_paths
-        or console.prompt_user("Proceed", default="y", choices=["y", "n"]) != "y"
-    ):
-        console.exit("Nothing to do...", variant="info")
+    site = SiteController(site_name, console)
+    with console.in_progress("Reloading services"):
+        site.restart_checkmk()
+        if commit.has_gui_change():
+            site.restart_apache()
+            site.restart_ui_scheduler()
 
-    with console.progress_spinner("Copying files"):
-        for valid_path in valid_paths:
-            src_path = repo_dir / valid_path
-            site_path = get_site_path(site, valid_path)
-            result = copy_file(src_path, site_path)
-            console.print_copy_result(str(site_path), result)
 
-    with console.progress_spinner("Reloading services"):
-        site_result = execute_site_command(site, "cmk -R")
-        console.print_reload_result("CMK restart", site_result)
+class AppConsole:
+    def __init__(self) -> None:
+        self._console = Console()
+        self._console.clear()
 
-        if last_commit.has_gui_change():
-            gui_result = execute_site_command(site, "omd reload apache")
-            console.print_reload_result("Apache reload", gui_result)
+    def heading(self, msg: str) -> None:
+        self._console.rule(msg)
 
-            ui_scheduler_result = execute_site_command(
-                site, "omd restart ui-job-scheduler"
-            )
-            console.print_reload_result("UI job scheduler restart", ui_scheduler_result)
+    def print(
+        self, msg: str, *, pad: PadVariant = None, style: StyleVariant = None
+    ) -> None:
+        pad_ = self._get_padding_value(pad)
+        style_ = self._get_style_value(style)
+        self._console.print(Padding(msg, pad=pad_), style=style_)
+
+    def exit(self, msg: str, *, style: StyleVariant) -> NoReturn:
+        exit_code = 1 if style == "danger" else 0
+        self.print(msg, style=style, pad="extra")
+        sys.exit(exit_code)
+
+    def prompt(self, msg: str, *, default: str, choices: list[str]) -> str:
+        m = f"  {msg}"  # unfortunately, can't apply padding to Prompt.ask.
+        return Prompt.ask(m, console=self._console, default=default, choices=choices)
+
+    def confirm(self) -> bool:
+        return self.prompt("Proceed", default="y", choices=["y", "n"]) == "y"
+
+    def in_progress(self, label: str) -> Status:
+        self._console.print()
+        return self._console.status(f"[blue]{label}...", spinner="dots3")
+
+    def _get_padding_value(self, variant: PadVariant) -> PaddingDimensions:
+        match variant:
+            case "extra":
+                return (1, 2)
+            case _:
+                return (0, 0, 0, 2)
+
+    def _get_style_value(self, variant: StyleVariant) -> str:
+        match variant:
+            case "success":
+                return "green"
+            case "danger":
+                return "red"
+            case "warn":
+                return "yellow"
+            case "muted":
+                return "gray50"
+            case _:
+                return "black"
+
+
+class SiteManager:
+    def __init__(self, console: AppConsole) -> None:
+        self._console = console
+
+    def select_site(self) -> str:
+        if len(sites := self.get_site_names()) == 1:
+            return sites[0]
+
+        mapping = {site: str(idx) for idx, site in enumerate(sites, 1)}
+        default = self.get_site_from_environment()
+
+        self._print_options(mapping, default)
+
+        return self._parse_selection(
+            sites, mapping.get(default, "1"), list(mapping.values())
+        )
+
+    @staticmethod
+    def get_site_names() -> list[str]:
+        raw_sites = subprocess.check_output(["omd", "sites", "--bare"]).decode("utf-8")
+        return [site for site in raw_sites.rstrip("\n").split("\n")]
+
+    @staticmethod
+    def get_site_from_environment() -> str:
+        if not (site_path := Path(".site")).exists():
+            return ""
+        return site_path.read_text().strip()
+
+    def _print_options(self, mapping: dict[str, str], default: str = "") -> None:
+        self._console.heading("Select a site")
+        self._console.print("Available sites:", pad="extra")
+        for site, idx in mapping.items():
+            style = None if site == default else "muted"
+            self._console.print(f"  {idx:<3}{site}", style=style)
+        self._console.print("")
+
+    def _parse_selection(
+        self, sites: list[str], default: str, choices: list[str]
+    ) -> str:
+        match choice := self._console.prompt(
+            "Select", default=default, choices=choices
+        ):
+            case "q":
+                self._console.exit("See you soon :)", style="success")
+            case _:
+                return sites[int(choice) - 1]
 
 
 @dataclasses.dataclass
-class LastCommit:
+class Commit:
     author: str
     time: str
     message: str
     filepaths: list[Path]
-
-    @classmethod
-    def from_repo(cls, repo: Repo) -> Self:
-        return cls(
-            author=repo.head.commit.author.name,
-            time=repo.head.commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
-            message=repo.head.commit.message,
-            filepaths=[Path(f) for f in repo.head.commit.stats.files.keys()],
-        )
 
     def get_valid_paths(self) -> list[Path]:
         return [fp for fp in self.filepaths if self._is_valid_path(fp)]
@@ -101,134 +176,115 @@ class LastCommit:
         return not str(fpath).startswith(INVALID_PATH_PREFIXES)
 
 
-Variant = Literal["success", "danger", "info"]
+class GitRepository:
+    def __init__(self, site: str, console: AppConsole) -> None:
+        self._site = site
+        self._console = console
 
+        self._git = self._load_git_repository()
+        self._site_python_dir = Path(f"/omd/sites/{self._site}/lib/python3")
 
-class AppConsole:
-    def __init__(self) -> None:
-        self.console = Console()
-        self.console.clear()
-
-    def exit(self, msg: str, *, variant: Variant) -> NoReturn:
-        match variant:
-            case "success":
-                style, code = "green", 0
-            case "danger":
-                style, code = "red", 1
-            case "info":
-                style, code = "blue", 0
-
-        self.console.print(msg, style=style, new_line_start=True)
-        sys.exit(code)
-
-    def prompt_user(
-        self, msg: str, *, default: str, choices: list[str] | None = None
-    ) -> str:
-        return Prompt.ask(msg, console=self.console, default=default, choices=choices)
-
-    def progress_spinner(self, label: str) -> Status:
-        self.console.print()
-        return self.console.status(f"[blue]{label}...", spinner="monkey")
-
-    def print_sites_info(self, site_mapping: dict[str, str], default: str = "") -> None:
-        self.console.rule("Select a site")
-        self.console.print("Available sites:", new_line_start=True, end="\n\n")
-        for site, idx in site_mapping.items():
-            color = "black" if site == default else "grey50"
-            self.console.print(f"  {idx:<3}{site}", style=color)
-        self.console.print()
-
-    def print_commit_info(self, site: str, commit: LastCommit, username: str) -> None:
-        self.console.rule("Last commit")
-        self.console.print(
-            f"\n{commit.author} ({commit.time})\n",
-            style="black" if commit.author == username else "red",
+    def get_last_commit(self) -> Commit:
+        return Commit(
+            author=self._git.head.commit.author.name,
+            time=self._git.head.commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+            message=self._git.head.commit.message,
+            filepaths=[Path(f) for f in self._git.head.commit.stats.files.keys()],
         )
-        self.console.print(f"{commit.message:.>30}", style="italic")
+
+    def print_commit_info(self, commit: Commit) -> None:
+        self._console.heading("Last commit")
+        self._console.print(f"{commit.author} ({commit.time})", pad="extra")
+        self._console.print(f"{commit.message:.>30}", style="muted")
 
         if not commit.filepaths:
-            self.exit("No changed files.", variant="info")
+            self._console.exit("No changed files.", style="success")
 
-        self.console.rule("Detected file changes")
-        self.console.print(f"\nSync the following files in '{site}' site:\n")
+        self._console.heading("Sync files")
+        self._console.print(f"Sync files to '{self._site}' site:", pad="extra")
         for fp in commit.get_valid_paths():
-            self.console.print(f"  {Path(f'/omd/sites/{site}/lib/python3') / fp}")
+            self._console.print(f"{self._site_python_dir / fp}", style="muted")
 
         if invalid_paths := commit.get_invalid_paths():
-            self.console.print("\nThe following paths cannot be copied:\n")
+            self._console.print("Unable to copy the following paths:", pad="extra")
             for fp in invalid_paths:
-                self.console.print(f"  {fp}", style="yellow")
+                self._console.print(str(fp), style="warn")
+        self._console.print("")
 
-        self.console.print()
+    @property
+    def directory(self) -> Path:
+        return Path(self._git.working_tree_dir or ".")
 
-    def print_copy_result(self, name: str, result: CompletedProcess) -> None:
+    def _load_git_repository(self) -> Repo:
+        try:
+            return Repo(search_parent_directories=True)
+        except InvalidGitRepositoryError:
+            self._console.exit("Make sure you're in a git repository.", style="danger")
+
+
+class FileSyncer:
+    def __init__(
+        self, site: str, repo_dir: Path, paths: list[Path], console: AppConsole
+    ) -> None:
+        self._site = site
+        self._repo_dir = repo_dir
+        self._paths = paths
+        self._console = console
+
+    def sync(self) -> None:
+        for path in self._paths:
+            src_path = self._repo_dir / path
+            site_path = self._get_site_path(path)
+            result = self._copy(src_path, site_path)
+            self._print_result(site_path, result)
+
+    def _get_site_path(self, fpath: Path) -> Path:
+        match fpath:
+            case path if str(path).startswith("active_checks"):
+                return Path(f"/omd/sites/{self._site}/lib/nagios/plugins") / fpath.name
+            case _:
+                return Path(f"/omd/sites/{self._site}/lib/python3") / fpath
+
+    def _copy(self, src_path: Path, site_path: Path) -> CompletedProcess:
+        args = ["sudo", "cp", "-R", src_path, site_path]
+        return subprocess.run(args, capture_output=True, text=True)
+
+    def _print_result(self, path: Path, result: CompletedProcess) -> None:
+        name = str(path)
         if result.returncode != 0:
-            self.console.print(f"\n Error copying file: {result.stderr}", style="red")
-            self.console.print(f"  '{name}' ❌", style="red")
+            self._console.print(f"ERROR: {result.stderr}", style="danger")
+            self._console.print(f"𐄂 {name}")
         else:
-            self.console.print(f"  '{name}' ✔️", style="green")
+            self._console.print(f"✓ {name}")
 
-    def print_reload_result(self, label: str, result: CompletedProcess) -> None:
-        self.console.rule(label)
+
+@dataclasses.dataclass
+class SiteController:
+    def __init__(self, site: str, console: AppConsole) -> None:
+        self._site = site
+        self._console = console
+
+    def restart_checkmk(self) -> None:
+        result = self._execute("cmk -R")
+        self._print_result("Restart Checkmk", result)
+
+    def restart_apache(self) -> None:
+        result = self._execute("omd reload apache")
+        self._print_result("Restart Apache", result)
+
+    def restart_ui_scheduler(self) -> None:
+        result = self._execute("omd restart ui-job-scheduler")
+        self._print_result("Restart UI Job Scheduler", result)
+
+    def _execute(self, cmd: str) -> CompletedProcess:
+        reload_cmd = f"sudo --login -u {self._site} -- {cmd}"
+        return subprocess.run(reload_cmd.split(), capture_output=True, text=True)
+
+    def _print_result(self, heading: str, result: CompletedProcess) -> None:
+        self._console.heading(heading)
         if result.returncode != 0:
-            self.console.print(f"❌  {result.stderr}", style="red")
-        self.console.print(result.stdout, style="dim")
-
-
-def get_site_names() -> list[str]:
-    raw_sites = subprocess.check_output(["omd", "sites", "--bare"]).decode("utf-8")
-    return [site for site in raw_sites.rstrip("\n").split("\n")]
-
-
-def get_site_from_environment() -> str:
-    if not (site_path := Path(".site")).exists():
-        return ""
-    return site_path.read_text().strip()
-
-
-def select_site(sites: list[str], console: AppConsole) -> str:
-    if len(sites) == 1:
-        return sites[0]
-
-    site_mapping = {site: str(idx) for idx, site in enumerate(sites, 1)}
-    site_environment = get_site_from_environment()
-
-    console.print_sites_info(site_mapping, site_environment)
-
-    match choice := console.prompt_user(
-        "Select a site",
-        default=site_mapping.get(site_environment, "1"),
-        choices=list(site_mapping.values()),
-    ):
-        case "q":
-            console.exit("See you soon :)", variant="success")
-        case _:
-            return sites[int(choice) - 1]
-
-
-def read_username_from_git_config(repo: Repo) -> str:
-    repo_config: GitConfigParser = repo.config_reader()
-    username = repo_config.get_value(section="user", option="name")
-    assert isinstance(username, str)
-    return username
-
-
-def get_site_path(site: str, fpath: Path) -> Path:
-    match fpath:
-        case path if str(path).startswith("active_checks"):
-            return Path(f"/omd/sites/{site}/lib/nagios/plugins") / fpath.name
-        case _:
-            return Path(f"/omd/sites/{site}/lib/python3") / fpath
-
-
-def copy_file(src_path: Path, site_path: Path) -> CompletedProcess:
-    args = ["sudo", "cp", "-R", src_path, site_path]
-    return subprocess.run(args, capture_output=True, text=True)
-
-
-def execute_site_command(site: str, cmd: str) -> CompletedProcess:
-    reload_cmd = f"sudo --login -u {site} -- {cmd}"
-    return subprocess.run(reload_cmd.split(), capture_output=True, text=True)
+            self._console.print(f"ERROR: {result.stderr}", style="danger")
+        self._console.print(result.stdout, style="muted")
 
 
 if __name__ == "__main__":
