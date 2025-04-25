@@ -46,7 +46,7 @@ def main() -> None:
         console.exit("No paths to copy.", style="success")
 
     with console.in_progress("Syncing files"):
-        FileSyncer(site_name, repo.directory, valid_paths, console).sync()
+        FileManager(site_name, repo.directory, valid_paths, console).sync()
 
     site = SiteController(site_name, console)
     with console.in_progress("Reloading services"):
@@ -222,7 +222,7 @@ class GitRepository:
             self._console.exit("Make sure you're in a git repository.", style="danger")
 
 
-class FileSyncer:
+class FileManager:
     def __init__(
         self, site: str, repo_dir: Path, paths: list[Path], console: AppConsole
     ) -> None:
