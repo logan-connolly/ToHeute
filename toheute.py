@@ -24,6 +24,8 @@ from rich.status import Status
 
 INVALID_PATH_PREFIXES = (".werks", "bin", "packages", "tests")
 """Paths starting with these prefixes should not be copied into site."""
+INVALID_PATH_PREFIX_WHITELIST = ("packages/cmk-frontend",)
+"""White list for nested directories that can be handled."""
 
 
 type PadVariant = Literal["extra"] | None
@@ -173,7 +175,9 @@ class Commit:
         return any(str(fpath).startswith("cmk/gui") for fpath in self.get_valid_paths())
 
     def _is_valid_path(self, fpath: Path) -> bool:
-        return not str(fpath).startswith(INVALID_PATH_PREFIXES)
+        invalid_prefix = str(fpath).startswith(INVALID_PATH_PREFIXES)
+        is_whitelisted = str(fpath).startswith(INVALID_PATH_PREFIX_WHITELIST)
+        return is_whitelisted or not invalid_prefix
 
 
 class GitRepository:
@@ -232,6 +236,9 @@ class FileManager:
         match fpath:
             case path if str(path).startswith("active_checks"):
                 return Path(f"/omd/sites/{self._site}/lib/nagios/plugins") / fpath.name
+            case path if str(path).startswith("packages/cmk-frontend/src"):
+                rp = path.relative_to("packages/cmk-frontend/src")
+                return Path(f"/omd/sites/{self._site}/share/check_mk/web/htdocs") / rp
             case _:
                 return Path(f"/omd/sites/{self._site}/lib/python3") / fpath
 
