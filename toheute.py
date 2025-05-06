@@ -22,10 +22,8 @@ from rich.prompt import Prompt
 from rich.padding import Padding, PaddingDimensions
 from rich.status import Status
 
-INVALID_PATH_PREFIXES = (".werks", "bin", "packages", "tests")
-"""Paths starting with these prefixes should not be copied into site."""
-INVALID_PATH_PREFIX_WHITELIST = ("packages/cmk-frontend",)
-"""White list for nested directories that can be handled."""
+PATH_PREFIX_BLOCK_LIST = (".werks", "bin", "packages", "tests")
+PATH_PREFIX_ALLOW_LIST = ("packages/cmk-frontend",)
 
 
 type PadVariant = Literal["extra"] | None
@@ -175,9 +173,9 @@ class Commit:
         return any(str(fpath).startswith("cmk/gui") for fpath in self.get_valid_paths())
 
     def _is_valid_path(self, fpath: Path) -> bool:
-        invalid_prefix = str(fpath).startswith(INVALID_PATH_PREFIXES)
-        is_whitelisted = str(fpath).startswith(INVALID_PATH_PREFIX_WHITELIST)
-        return is_whitelisted or not invalid_prefix
+        in_block_list = str(fpath).startswith(PATH_PREFIX_BLOCK_LIST)
+        in_allow_list = str(fpath).startswith(PATH_PREFIX_ALLOW_LIST)
+        return not in_block_list or in_allow_list
 
 
 class GitRepository:
