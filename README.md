@@ -18,6 +18,21 @@ toheute.py
 
 You will then be presented with a dialog for which site to patch your change to.
 
+### options
+
+Run `toheute.py --help` to see what options are available:
+
+```console
+Usage: toheute.py [OPTIONS]
+
+  Patch your local HEAD commit into a running Checkmk site.
+
+Options:
+  --no-reload    Don't reload services.
+  --full-reload  Force a full reload of services.
+  --help         Show this message and exit.
+```
+
 ## development
 
 To create a dedicated virtual environment with required dependencies, run:

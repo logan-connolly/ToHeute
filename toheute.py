@@ -36,6 +36,7 @@ type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 @click.option("--no-reload", is_flag=True, help="Don't reload services.")
 @click.option("--full-reload", is_flag=True, help="Force a full reload of services.")
 def main(no_reload: bool, full_reload: bool) -> None:
+    """Patch your local HEAD commit into a running Checkmk site."""
     console = AppConsole()
 
     site_name = SiteManager(console).select_site()
