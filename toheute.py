@@ -3,6 +3,7 @@
 # ///script
 # requires-python = ">=3.12"
 # dependencies = [
+#    "click>=8.2.0",
 #    "gitpython>=3.1.44",
 #    "rich>=13.9.4",
 # ]
@@ -16,6 +17,7 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Literal, NoReturn
 
+import click
 from git import InvalidGitRepositoryError, Repo
 from rich.console import Console
 from rich.prompt import Prompt
@@ -30,7 +32,9 @@ type PadVariant = Literal["extra"] | None
 type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 
 
-def main() -> None:
+@click.command()
+@click.option("--no-reload", is_flag=True, help="Don't reload services.")
+def main(no_reload: bool) -> None:
     console = AppConsole()
 
     site_name = SiteManager(console).select_site()
@@ -47,6 +51,9 @@ def main() -> None:
 
     with console.in_progress("Syncing files"):
         FileManager(site_name, valid_paths, console).sync()
+
+    if no_reload:
+        console.exit("Not reloading services. Done :)", style="success")
 
     site = SiteController(site_name, console)
     with console.in_progress("Reloading services"):
