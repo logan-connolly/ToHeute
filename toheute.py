@@ -34,7 +34,8 @@ type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 
 @click.command()
 @click.option("--no-reload", is_flag=True, help="Don't reload services.")
-def main(no_reload: bool) -> None:
+@click.option("--full-reload", is_flag=True, help="Force a full reload of services.")
+def main(no_reload: bool, full_reload: bool) -> None:
     console = AppConsole()
 
     site_name = SiteManager(console).select_site()
@@ -52,13 +53,13 @@ def main(no_reload: bool) -> None:
     with console.in_progress("Syncing files"):
         FileManager(site_name, valid_paths, console).sync()
 
-    if no_reload:
+    if no_reload and not full_reload:
         console.exit("Not reloading services. Done :)", style="success")
 
     site = SiteController(site_name, console)
     with console.in_progress("Reloading services"):
         site.restart_checkmk()
-        if commit.has_gui_change():
+        if full_reload or commit.has_gui_change():
             site.restart_apache()
             site.restart_ui_scheduler()
 
