@@ -1,22 +1,24 @@
 # toheute
 
-> a simple utility for copying in local changes to checkmk sites.
+> sync local changes with a Checkmk site.
 
 ## setup
 
-The `toheute.py` is a self-contained python script that can be run by [uv](https://github.com/astral-sh/uv). Since it is an executable, you just need to make sure that the executable can be found on your path. For example:
+`toheute.py` is a self-contained python script that requires
+[uv](https://github.com/astral-sh/uv) to run.
+
+The script can be run as an executable, so you only need to make sure that it
+can be found on your path:
 
 ```console
 ln -sf $PWD/toheute.py $HOME/.local/bin/toheute.py
 ```
 
-Once it's there, simply run the following command from a checkmk repository:
+Once it's there, navigate to the checkmk repository and run:
 
 ```console
 toheute.py
 ```
-
-You will then be presented with a dialog for which site to patch your change to.
 
 ### options
 
@@ -46,8 +48,11 @@ source .venv/bin/activate
 
 ## disclaimer
 
-This is not an all inclusive tool for checkmk development, but instead a simple one that meets most use cases.
+This is not an all inclusive tool for checkmk development, but instead a simple
+one that meets most use cases.
 
 ## acknowledgments
 
-The original [implementation](https://github.com/gavinmcguigan/ToHeute) was created by [@gavinmcguigan](https://github.com/gavinmcguigan) - all props should be directed his way.
+The original [implementation](https://github.com/gavinmcguigan/ToHeute) was
+created by [@gavinmcguigan](https://github.com/gavinmcguigan) - all props
+should be directed his way.
