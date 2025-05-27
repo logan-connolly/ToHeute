@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Literal, NoReturn
+from typing import Iterable, Literal, NoReturn
 
 import click
 from git import InvalidGitRepositoryError, Repo
@@ -28,39 +28,44 @@ PATH_PREFIX_BLOCK_LIST = (".werks", "bin", "packages", "tests")
 PATH_PREFIX_ALLOW_LIST = ("packages/cmk-frontend",)
 
 
-type PadVariant = Literal["extra"] | None
+type PadVariant = Literal["extra", "top"] | None
 type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 
 
 @click.command()
+@click.option("--n-commits", default=1, help="Number of commits to sync.")
 @click.option("--no-reload", is_flag=True, help="Don't reload services.")
 @click.option("--full-reload", is_flag=True, help="Force a full reload of services.")
-def main(no_reload: bool, full_reload: bool) -> None:
+def main(n_commits: int, no_reload: bool, full_reload: bool) -> None:
     """Patch your local HEAD commit into a running Checkmk site."""
+
     console = AppConsole()
-
-    site_name = SiteManager(console).select_site()
-
     repo = GitRepository(console)
-    commit = repo.get_last_commit()
-    repo.print_commit_info(commit)
+    site_name = SiteManager(console).select_site()
+    site = SiteController(site_name, console)
 
-    if not (valid_paths := commit.get_valid_paths()):
+    paths_to_sync = set()
+    for commit in repo.get_commits(n_commits):
+        repo.print_commit_info(commit)
+        paths_to_sync.update(commit.get_valid_paths())
+
+    has_gui_change = any(str(p).startswith("cmk/gui") for p in paths_to_sync)
+
+    if not paths_to_sync:
         console.exit("No paths available to copy.", style="warn")
 
     if not console.confirm():
         console.exit("No paths to copy.", style="success")
 
     with console.in_progress("Syncing files"):
-        FileManager(site_name, valid_paths, console).sync()
+        FileManager(site_name, paths_to_sync, console).sync()
 
     if no_reload and not full_reload:
         console.exit("Not reloading services. Done :)", style="success")
 
-    site = SiteController(site_name, console)
     with console.in_progress("Reloading services"):
         site.restart_checkmk()
-        if full_reload or commit.has_gui_change():
+        if full_reload or has_gui_change:
             site.restart_apache()
             site.restart_ui_scheduler()
 
@@ -100,6 +105,8 @@ class AppConsole:
         match variant:
             case "extra":
                 return (1, 2)
+            case "top":
+                return (1, 0, 0, 2)
             case _:
                 return (0, 0, 0, 2)
 
@@ -178,9 +185,6 @@ class Commit:
     def get_invalid_paths(self) -> list[Path]:
         return [fp for fp in self.filepaths if not self._is_valid_path(fp)]
 
-    def has_gui_change(self) -> bool:
-        return any(str(fpath).startswith("cmk/gui") for fpath in self.get_valid_paths())
-
     def _is_valid_path(self, fpath: Path) -> bool:
         in_block_list = str(fpath).startswith(PATH_PREFIX_BLOCK_LIST)
         in_allow_list = str(fpath).startswith(PATH_PREFIX_ALLOW_LIST)
@@ -192,30 +196,28 @@ class GitRepository:
         self._console = console
         self._git = self._load_git_repository()
 
-    def get_last_commit(self) -> Commit:
-        return Commit(
-            author=self._git.head.commit.author.name,
-            time=self._git.head.commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
-            message=self._git.head.commit.message,
-            filepaths=[Path(f) for f in self._git.head.commit.stats.files.keys()],
-        )
+    def get_commits(self, n: int) -> list[Commit]:
+        return [
+            Commit(
+                author=c.author.name,
+                time=c.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                message=c.message,
+                filepaths=[Path(f) for f in c.stats.files.keys()],
+            )
+            for c in self._git.iter_commits(self._git.active_branch, max_count=n)
+        ]
 
     def print_commit_info(self, commit: Commit) -> None:
         self._console.heading("Last commit")
         self._console.print(f"{commit.author} ({commit.time})", pad="extra")
         self._console.print(f"{commit.message:.>30}", style="muted")
 
-        if not commit.filepaths:
-            self._console.exit("No changed files.", style="success")
-
-        self._console.heading("Sync files")
-
-        self._console.print("The following files will be copied:", pad="extra")
+        self._console.print("The following files will be copied:")
         for fp in commit.get_valid_paths():
-            self._console.print(str(fp), style="muted")
+            self._console.print(str(fp), style="success")
 
         if invalid_paths := commit.get_invalid_paths():
-            self._console.print("Unable to sync the following files:", pad="extra")
+            self._console.print("Unable to sync the following files:", pad="top")
             for fp in invalid_paths:
                 self._console.print(str(fp), style="warn")
         self._console.print("")
@@ -228,7 +230,7 @@ class GitRepository:
 
 
 class FileManager:
-    def __init__(self, site: str, paths: list[Path], console: AppConsole) -> None:
+    def __init__(self, site: str, paths: Iterable[Path], console: AppConsole) -> None:
         self._site = site
         self._paths = paths
         self._console = console
