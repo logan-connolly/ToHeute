@@ -28,9 +28,10 @@ Usage: toheute.py [OPTIONS]
   Patch your local HEAD commit into a running Checkmk site.
 
 Options:
-  --no-reload    Don't reload services.
-  --full-reload  Force a full reload of services.
-  --help         Show this message and exit.
+  --n-commits INTEGER  Number of commits to sync.
+  --no-reload          Don't reload services.
+  --full-reload        Force a full reload of services.
+  --help               Show this message and exit.
 ```
 
 ## development
