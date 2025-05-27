@@ -27,7 +27,6 @@ from rich.status import Status
 PATH_PREFIX_BLOCK_LIST = (".werks", "bin", "packages", "tests")
 PATH_PREFIX_ALLOW_LIST = ("packages/cmk-frontend",)
 
-
 type PadVariant = Literal["extra", "top"] | None
 type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 
