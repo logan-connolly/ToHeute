@@ -237,6 +237,7 @@ class FileManager:
     def sync(self) -> None:
         for path in self._paths:
             site_path = self._get_site_path(path)
+            self._ensure_directory_exists(site_path)
             result = self._copy(path, site_path)
             self._print_result(site_path, result)
 
@@ -249,6 +250,10 @@ class FileManager:
                 return Path(f"/omd/sites/{self._site}/share/check_mk/web/htdocs") / rp
             case _:
                 return Path(f"/omd/sites/{self._site}/lib/python3") / fpath
+
+    def _ensure_directory_exists(self, site_path: Path) -> None:
+        args = ["sudo", "mkdir", "-p", site_path.parent]
+        subprocess.run(args, capture_output=True, text=True)
 
     def _copy(self, src_path: Path, site_path: Path) -> CompletedProcess:
         args = ["sudo", "cp", "-R", src_path, site_path]
