@@ -33,8 +33,8 @@ type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 
 @click.command()
 @click.option("--n-commits", default=1, help="Number of commits to sync.")
-@click.option("--full-reload", is_flag=True, help="Force a full reload of services.")
-def main(n_commits: int, full_reload: bool) -> None:
+@click.option("--reload-gui", is_flag=True, help="Reload GUI related services.")
+def main(n_commits: int, reload_gui: bool) -> None:
     """Patch your local HEAD commit into a running Checkmk site."""
 
     console = AppConsole()
@@ -58,7 +58,8 @@ def main(n_commits: int, full_reload: bool) -> None:
 
     with console.in_progress("Reloading services"):
         site.restart_checkmk()
-        if full_reload:
+
+        if reload_gui:
             site.restart_apache()
             site.restart_ui_scheduler()
 
