@@ -33,8 +33,9 @@ type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 
 @click.command()
 @click.option("--n-commits", default=1, help="Number of commits to sync.")
-@click.option("--reload-gui", is_flag=True, help="Reload GUI related services.")
-def main(n_commits: int, reload_gui: bool) -> None:
+@click.option("--gui", is_flag=True, help="Restart GUI related services.")
+@click.option("--full", is_flag=True, help="Restart all services of site")
+def main(n_commits: int, gui: bool, full: bool) -> None:
     """Patch your commits into a Checkmk site."""
 
     console = AppConsole()
@@ -57,7 +58,7 @@ def main(n_commits: int, reload_gui: bool) -> None:
         FileManager(site_manager, paths_to_sync, console).sync()
 
     with console.in_progress("Reloading services"):
-        site_controller.restart_services(reload_gui)
+        site_controller.restart_services(gui, full)
 
 
 class AppConsole:
@@ -265,11 +266,17 @@ class SiteController:
         self._site = site
         self._console = console
 
-    def restart_services(self, reload_gui: bool) -> None:
-        self._restart_checkmk_core()
-        if reload_gui:
+    def restart_services(self, gui: bool, full: bool) -> None:
+        if gui and not full:
+            self._restart_checkmk_core()
             self._restart_apache()
             self._restart_ui_scheduler()
+        elif full:
+            self._restart_site()
+
+    def _restart_site(self) -> None:
+        result = self._execute("omd restart")
+        self._print_result("Restart all services", result)
 
     def _restart_checkmk_core(self) -> None:
         result = self._execute("cmk -R")
