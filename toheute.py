@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --no-project
 
 # ///script
-# requires-python = ">=3.12"
+# requires-python = ">=3.13"
 # dependencies = [
 #    "click>=8.2.0",
 #    "gitpython>=3.1.44",
