@@ -57,7 +57,7 @@ def main(n_commits: int, reload_gui: bool) -> None:
         FileManager(site_name, paths_to_sync, console).sync()
 
     with console.in_progress("Reloading services"):
-        site.restart_checkmk()
+        site.restart_checkmk_core()
 
         if reload_gui:
             site.restart_apache()
@@ -269,7 +269,7 @@ class SiteController:
         self._site = site
         self._console = console
 
-    def restart_checkmk(self) -> None:
+    def restart_checkmk_core(self) -> None:
         result = self._execute("cmk -R")
         self._print_result("Restart Checkmk", result)
 
