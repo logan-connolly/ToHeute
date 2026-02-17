@@ -39,8 +39,8 @@ def main(n_commits: int, reload_gui: bool) -> None:
 
     console = AppConsole()
     repo = GitRepository(console)
-    site_name = SiteManager(console).select_site()
-    site = SiteController(site_name, console)
+    site_manager = SiteManager(console).select_site()
+    site_controller = SiteController(site_manager, console)
 
     paths_to_sync = set()
     for commit in repo.get_commits(n_commits):
@@ -54,10 +54,10 @@ def main(n_commits: int, reload_gui: bool) -> None:
         console.exit("No paths to copy.", style="success")
 
     with console.in_progress("Syncing files"):
-        FileManager(site_name, paths_to_sync, console).sync()
+        FileManager(site_manager, paths_to_sync, console).sync()
 
     with console.in_progress("Reloading services"):
-        site.restart_services(reload_gui)
+        site_controller.restart_services(reload_gui)
 
 
 class AppConsole:
