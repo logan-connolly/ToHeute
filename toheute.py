@@ -35,7 +35,7 @@ type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 @click.option("--n-commits", default=1, help="Number of commits to sync.")
 @click.option("--reload-gui", is_flag=True, help="Reload GUI related services.")
 def main(n_commits: int, reload_gui: bool) -> None:
-    """Patch your local HEAD commit into a running Checkmk site."""
+    """Patch your commits into a Checkmk site."""
 
     console = AppConsole()
     repo = GitRepository(console)
