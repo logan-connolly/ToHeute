@@ -32,9 +32,9 @@ type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 
 
 @click.command()
-@click.option("--n-commits", default=1, help="Number of commits to sync.")
-@click.option("--gui", is_flag=True, help="Restart GUI related services.")
-@click.option("--full", is_flag=True, help="Restart all services of site")
+@click.option("--n-commits", "-n", default=1, help="Number of commits to sync.")
+@click.option("--gui", "-g", is_flag=True, help="Restart GUI related services.")
+@click.option("--full", "-f", is_flag=True, help="Restart all services of site")
 def main(n_commits: int, gui: bool, full: bool) -> None:
     """Patch your commits into a Checkmk site."""
 
