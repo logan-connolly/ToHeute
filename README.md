@@ -46,6 +46,27 @@ uv pip install click gitpython rich
 source .venv/bin/activate
 ```
 
+## troubleshooting
+
+If you are having some issues with a conflicting uv environment, it is probably
+best to put this into a dedicated script. Here is how a script could look like
+on your `PATH`:
+
+```shell
+#!/bin/bash
+
+# Specify the explicit path in the event that the uv used in the checkmk project
+# differs from the uv version that you want to run.
+~/.cargo/bin/uv run \
+  --quiet \
+  --isolated \
+  --python 3.13 \
+  --with 'click>=8.2.0' \
+  --with 'gitpython>=3.1.44' \
+  --with 'rich>=13.9.4' \
+  ~/git/ToHeute/toheute.py $@
+```
+
 ## disclaimer
 
 This is not an all inclusive tool for checkmk development, but instead a simple
