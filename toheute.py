@@ -33,9 +33,8 @@ type StyleVariant = Literal["success", "danger", "warn", "muted"] | None
 
 @click.command()
 @click.option("--n-commits", default=1, help="Number of commits to sync.")
-@click.option("--no-reload", is_flag=True, help="Don't reload services.")
 @click.option("--full-reload", is_flag=True, help="Force a full reload of services.")
-def main(n_commits: int, no_reload: bool, full_reload: bool) -> None:
+def main(n_commits: int, full_reload: bool) -> None:
     """Patch your local HEAD commit into a running Checkmk site."""
 
     console = AppConsole()
@@ -48,8 +47,6 @@ def main(n_commits: int, no_reload: bool, full_reload: bool) -> None:
         repo.print_commit_info(commit)
         paths_to_sync.update(commit.get_valid_paths())
 
-    has_gui_change = any(str(p).startswith("cmk/gui") for p in paths_to_sync)
-
     if not paths_to_sync:
         console.exit("No paths available to copy.", style="warn")
 
@@ -59,12 +56,9 @@ def main(n_commits: int, no_reload: bool, full_reload: bool) -> None:
     with console.in_progress("Syncing files"):
         FileManager(site_name, paths_to_sync, console).sync()
 
-    if no_reload and not full_reload:
-        console.exit("Not reloading services. Done :)", style="success")
-
     with console.in_progress("Reloading services"):
         site.restart_checkmk()
-        if full_reload or has_gui_change:
+        if full_reload:
             site.restart_apache()
             site.restart_ui_scheduler()
 
