@@ -57,11 +57,7 @@ def main(n_commits: int, reload_gui: bool) -> None:
         FileManager(site_name, paths_to_sync, console).sync()
 
     with console.in_progress("Reloading services"):
-        site.restart_checkmk_core()
-
-        if reload_gui:
-            site.restart_apache()
-            site.restart_ui_scheduler()
+        site.restart_services(reload_gui)
 
 
 class AppConsole:
@@ -269,15 +265,21 @@ class SiteController:
         self._site = site
         self._console = console
 
-    def restart_checkmk_core(self) -> None:
+    def restart_services(self, reload_gui: bool) -> None:
+        self._restart_checkmk_core()
+        if reload_gui:
+            self._restart_apache()
+            self._restart_ui_scheduler()
+
+    def _restart_checkmk_core(self) -> None:
         result = self._execute("cmk -R")
         self._print_result("Restart Checkmk", result)
 
-    def restart_apache(self) -> None:
+    def _restart_apache(self) -> None:
         result = self._execute("omd reload apache")
         self._print_result("Restart Apache", result)
 
-    def restart_ui_scheduler(self) -> None:
+    def _restart_ui_scheduler(self) -> None:
         result = self._execute("omd restart ui-job-scheduler")
         self._print_result("Restart UI Job Scheduler", result)
 
