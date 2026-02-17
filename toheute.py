@@ -44,8 +44,8 @@ def main(n_commits: int, gui: bool, full: bool) -> None:
     site_controller = SiteController(site, console)
 
     paths_to_sync = set()
-    for commit in repo.get_commits(n_commits):
-        repo.print_commit_info(commit)
+    for offset, commit in enumerate(repo.get_commits(n_commits)):
+        repo.print_commit_info(commit, offset)
         paths_to_sync.update(commit.get_valid_paths())
 
     if not paths_to_sync:
@@ -198,8 +198,8 @@ class GitRepository:
             for c in self._git.iter_commits(self._git.active_branch, max_count=n)
         ]
 
-    def print_commit_info(self, commit: Commit) -> None:
-        self._console.heading("Last commit")
+    def print_commit_info(self, commit: Commit, offset: int) -> None:
+        self._console.heading(f"HEAD~{offset}")
         self._console.print(f"{commit.author} ({commit.time})", pad="extra")
         self._console.print(f"{commit.message:.>30}", style="muted")
 
